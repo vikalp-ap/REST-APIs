@@ -1,4 +1,3 @@
-using System;
 using System.Data;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
@@ -11,29 +10,29 @@ namespace RESTAPIs.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly string? _connectionString;
+
         public UsersController(IConfiguration configuration)
         {
             _configuration = configuration;
+            _connectionString = _configuration.GetConnectionString("UsersCon");
         }
 
         [HttpGet]
         [Route("/users")]
-        public IActionResult Get()
+        public async Task<IActionResult> Get()
         {
             try
             {
                 string query = @"SELECT * FROM users ORDER BY id ASC";
                 DataTable table = new DataTable();
-                string? sqlDataSource = _configuration.GetConnectionString("UsersCon");
-                NpgsqlDataReader myReader;
-                using (var conn = new NpgsqlConnection(sqlDataSource))
+                using (var conn = new NpgsqlConnection(_connectionString))
                 {
-                    conn.Open();
+                    await conn.OpenAsync();
                     using (NpgsqlCommand command = new NpgsqlCommand(query, conn))
                     {
-                        myReader = command.ExecuteReader();
+                        NpgsqlDataReader myReader = await command.ExecuteReaderAsync();
                         table.Load(myReader);
-                        conn.Close();
                     }
                 }
                 return Ok(table);
@@ -46,28 +45,20 @@ namespace RESTAPIs.Controllers
 
         [HttpPost]
         [Route("/addUsers")]
-        public IActionResult Post(UsersModel user)
+        public async Task<IActionResult> Post(UsersModel user)
         {
             try
             {
                 string query = @"INSERT INTO users (name, email, age) VALUES (@Name, @Email, @Age);";
-
-                DataTable table = new DataTable();
-                string? sqlDataSource = _configuration.GetConnectionString("UsersCon");
-                NpgsqlDataReader myReader;
-                using (NpgsqlConnection myCon = new NpgsqlConnection(sqlDataSource))
+                using (NpgsqlConnection myCon = new NpgsqlConnection(_connectionString))
                 {
-                    myCon.Open();
+                    await myCon.OpenAsync();
                     using (NpgsqlCommand myCommand = new NpgsqlCommand(query, myCon))
                     {
-                        myCommand.Parameters.AddWithValue("@Name", user.Name);
-                        myCommand.Parameters.AddWithValue("@Email", user.Email);
+                        myCommand.Parameters.AddWithValue("@Name", user.Name ?? (object)DBNull.Value);
+                        myCommand.Parameters.AddWithValue("@Email", user.Email ?? (object)DBNull.Value);
                         myCommand.Parameters.AddWithValue("@Age", user.Age);
-                        myReader = myCommand.ExecuteReader();
-                        table.Load(myReader);
-
-                        myReader.Close();
-                        myCon.Close();
+                        await myCommand.ExecuteNonQueryAsync();
                     }
                 }
                 return Ok("Added Successfully");
@@ -80,25 +71,19 @@ namespace RESTAPIs.Controllers
 
         [HttpPut]
         [Route("/updateUsers")]
-        public IActionResult Put(UsersModel user)
+        public async Task<IActionResult> Put(UsersModel user)
         {
             try
             {
                 string query = @"UPDATE users SET name = @Name WHERE id = @Id;";
-                DataTable table = new DataTable();
-                string? sqlDataSource = _configuration.GetConnectionString("UsersCon");
-                NpgsqlDataReader myReader;
-                using (NpgsqlConnection myCon = new NpgsqlConnection(sqlDataSource))
+                using (NpgsqlConnection myCon = new NpgsqlConnection(_connectionString))
                 {
-                    myCon.Open();
+                    await myCon.OpenAsync();
                     using (NpgsqlCommand myCommand = new NpgsqlCommand(query, myCon))
                     {
-                        myCommand.Parameters.AddWithValue("@Name", user.Name);
+                        myCommand.Parameters.AddWithValue("@Name", user.Name ?? (object)DBNull.Value);
                         myCommand.Parameters.AddWithValue("@Id", user.Id);
-                        myReader = myCommand.ExecuteReader();
-                        table.Load(myReader);
-                        myReader.Close();
-                        myCon.Close();
+                        await myCommand.ExecuteNonQueryAsync();
                     }
                 }
                 return Ok("Updated Successfully");
@@ -111,28 +96,21 @@ namespace RESTAPIs.Controllers
 
         [HttpDelete]
         [Route("/deleteUsers")]
-        public IActionResult Delete(UsersModel user)
+        public async Task<IActionResult> Delete(UsersModel user)
         {
             try
             {
                 string query = @"DELETE FROM users WHERE id = @Id;";
-                DataTable table = new DataTable();
-                string? sqlDataSource = _configuration.GetConnectionString("UsersCon");
-                NpgsqlDataReader myReader;
-                using (NpgsqlConnection myCon = new NpgsqlConnection(sqlDataSource))
+                using (NpgsqlConnection myCon = new NpgsqlConnection(_connectionString))
                 {
-                    myCon.Open();
+                    await myCon.OpenAsync();
                     using (NpgsqlCommand myCommand = new NpgsqlCommand(query, myCon))
                     {
                         myCommand.Parameters.AddWithValue("@Id", user.Id);
-                        myReader = myCommand.ExecuteReader();
-                        table.Load(myReader);
-                        myReader.Close();
-                        myCon.Close();
-
+                        await myCommand.ExecuteNonQueryAsync();
                     }
                 }
-                return Ok("Updated Successfully");
+                return Ok("Deleted Successfully");
             }
             catch (Exception ex)
             {
